@@ -300,7 +300,7 @@ async def uninvitedPmHandler(message: Message):
                     noPmMessage.format_map(SafeDict(**user_dict)) + '\n`- Protected by userge`')
         else:
             await message.reply_photo(
-                caption=f"{noPmMessage.format_map(SafeDict(**user_dict))},
+                caption=f"{noPmMessage.format_map(SafeDict(**user_dict))}",
                 photo="https://telegra.ph/file/098a4a76a8a21d5bb9cdc.jpg")
         await asyncio.sleep(1)
         await CHANNEL.log(f"#NEW_MESSAGE\n{user_dict['mention']} has messaged you")
