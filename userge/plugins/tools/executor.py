@@ -12,6 +12,8 @@ import io
 import sys
 import asyncio
 import keyword
+import re
+import shlex
 import threading
 import traceback
 from contextlib import contextmanager
@@ -163,7 +165,8 @@ async def eval_(message: Message):
 
     msg = message
     replied = message.reply_to_message
-    if (replied and replied.from_user.is_self and isinstance(replied.text, Str)
+    if (replied and replied.from_user
+            and replied.from_user.is_self and isinstance(replied.text, Str)
             and str(replied.text.html).startswith("<b>></b> <pre>")):
         msg = replied
 
@@ -205,7 +208,13 @@ async def term_(message: Message):
 
     await message.edit("`Executing terminal ...`")
     try:
-        t_obj = await Term.execute(cmd)  # type: Term
+        parsed_cmd = parse_py_template(cmd, message)
+    except Exception as e:  # pylint: disable=broad-except
+        await message.err(str(e))
+        await CHANNEL.log(f"**Exception**: {type(e).__name__}\n**Message**: " + str(e))
+        return
+    try:
+        t_obj = await Term.execute(parsed_cmd)  # type: Term
     except Exception as t_e:  # pylint: disable=broad-except
         await message.err(str(t_e))
         return
@@ -215,13 +224,17 @@ async def term_(message: Message):
         uid = geteuid()
     except ImportError:
         uid = 1
-    output = f"{cur_user}:~# {cmd}\n" if uid == 0 else f"{cur_user}:~$ {cmd}\n"
+    prefix = f"<b>{cur_user}:~#</b>" if uid == 0 else f"<b>{cur_user}:~$</b>"
+    output = f"{prefix} <pre>{cmd}</pre>\n"
 
     async def _worker():
         await t_obj.wait()
         while not t_obj.finished:
-            await message.edit(f"<pre>{output}{await t_obj.read_line()}</pre>", parse_mode='html')
-            await asyncio.sleep(Config.EDIT_SLEEP_TIMEOUT)
+            await message.edit(f"{output}<pre>{await t_obj.read_line()}</pre>", parse_mode='html')
+            try:
+                await asyncio.wait_for(t_obj.finish_listener, Config.EDIT_SLEEP_TIMEOUT)
+            except asyncio.TimeoutError:
+                pass
 
     def _on_cancel():
         t_obj.cancel()
@@ -235,7 +248,7 @@ async def term_(message: Message):
             await message.canceled(reply=True)
             return
 
-    out_data = f"<pre>{output}{await t_obj.get_output()}</pre>"
+    out_data = f"{output}<pre>{await t_obj.get_output()}</pre>\n{prefix}"
     await message.edit_or_send_as_file(
         out_data, parse_mode='html', filename="term.txt", caption=cmd)
 
@@ -249,6 +262,14 @@ async def init_func(message: Message):
         await message.edit("`That's a dangerous operation! Not Permitted!`")
         return None
     return cmd
+
+
+def parse_py_template(cmd: str, msg: Message):
+    glo, loc = _context(_ContextType.PRIVATE, message=msg, replied=msg.reply_to_message)
+
+    def replacer(mobj):
+        return shlex.quote(str(eval(mobj.expand(r"\1"), glo, loc)))  # nosec pylint: disable=W0123
+    return re.sub(r"{{(.+?)}}", replacer, cmd)
 
 
 class _ContextType(Enum):
@@ -354,15 +375,27 @@ class Term:
         self._loop = asyncio.get_event_loop()
         self._flag = False
         self._finished = False
+        self._finish_listener = self._loop.create_future()
+
+    def _finish(self) -> None:
+        self._finished = True
+        if not self._finish_listener.done():
+            self._finish_listener.set_result(None)
 
     def cancel(self) -> None:
         self._process.kill()
         self._event.set()
-        self._finished = True
+        self._finish()
 
     @property
     def finished(self) -> bool:
         return self._finished
+
+    @property
+    def finish_listener(self) -> asyncio.Future:
+        if self._finish_listener.done():
+            self._finish_listener = self._loop.create_future()
+        return self._finish_listener
 
     async def wait(self) -> None:
         await self._event.wait()
@@ -401,7 +434,7 @@ class Term:
         await asyncio.wait([self._read_stdout(), self._read_stderr()])
         await self._process.wait()
         self._event.set()
-        self._finished = True
+        self._finish()
 
     @classmethod
     async def execute(cls, cmd: str) -> 'Term':
