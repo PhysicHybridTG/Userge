@@ -301,7 +301,7 @@ async def uninvitedPmHandler(message: Message):
         else:
             await message.reply_video(
                 caption=f"{noPmMessage.format_map(SafeDict(**user_dict))}",
-                video="https://telegra.ph/file/b130e952279c45bf56ee7.mp4")
+                video="https://telegra.ph/file/5d6f2f0c69c1ca8635691.mp4")
         await asyncio.sleep(1)
         await CHANNEL.log(f"#NEW_MESSAGE\n{user_dict['mention']} has messaged you")
 
