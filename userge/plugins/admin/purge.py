@@ -11,7 +11,7 @@ from datetime import datetime
 from userge import userge, Message
 
 
-@userge.on_cmd("purge", about={
+@userge.on_cmd("oc", about={
     'header': "purge messages from user",
     'flags': {
         '-u': "get user_id from replied message",
