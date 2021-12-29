@@ -130,7 +130,7 @@ if userge.has_bot:
                 [
                     InlineKeyboardButton(text="ByeTG👨‍🦯", url="https://t.me/WTFHY"),
                     InlineKeyboardButton(text="OKbie⚰", url="https://t.me/BeyTG")
-                
+                ],
             ])
             await send_start_text(msg, text, path, markup)
             return
