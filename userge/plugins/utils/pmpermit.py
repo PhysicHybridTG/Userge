@@ -284,7 +284,7 @@ async def uninvitedPmHandler(message: Message):
             pmCounter[message.from_user.id] += 1
             await message.reply(
                 f"You have {pmCounter[message.from_user.id]} out of 4 **Warnings**\n"
-                "Please wait until you get approved to pm !", del_in=5)
+                "Please wait until you get approved to pm !\n\n<b>Don't Spam Here🤬</b>", del_in=5)
     else:
         pmCounter.update({message.from_user.id: 1})
         if userge.has_bot and _IS_INLINE:
