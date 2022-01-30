@@ -74,7 +74,7 @@ async def allow(message: Message):
             del_in=3)
 
 
-@userge.on_cmd("no", about={
+@userge.on_cmd("nopm", about={
     'header': "Activates guarding on inbox",
     'flags': {"-all": "Delete all allowed PM's"},
     'description': "Ones someone is allowed, "
